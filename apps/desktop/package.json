@@ -1,0 +1,82 @@
+{
+  "name": "@deepseek-ai/dsh-desktop",
+  "description": "Desktop distribution of the DeepSeek Harness Web application",
+  "version": "0.1.0-rc.5",
+  "author": "DeepSeek AI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "directory": "apps/desktop"
+  },
+  "private": true,
+  "type": "module",
+  "main": "lib/main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "tsx ../../scripts/build-desktop.ts"
+  },
+  "dependencies": {
+    "@deepseek-ai/cosmokit": "workspace:^",
+    "@deepseek-ai/cordis-plugin-group": "workspace:^",
+    "@deepseek-ai/dsh": "workspace:^",
+    "@deepseek-ai/dsh-anonymous-user-id": "workspace:^",
+    "@deepseek-ai/dsh-atomic-write": "workspace:^",
+    "@deepseek-ai/dsh-bash-local": "workspace:^",
+    "@deepseek-ai/dsh-code-runtime": "workspace:^",
+    "@deepseek-ai/dsh-compaction": "workspace:^",
+    "@deepseek-ai/dsh-fs": "workspace:^",
+    "@deepseek-ai/dsh-invariants": "workspace:^",
+    "@deepseek-ai/dsh-output-retention": "workspace:^",
+    "@deepseek-ai/dsh-sandbox": "workspace:^",
+    "@deepseek-ai/dsh-scope": "workspace:^",
+    "@deepseek-ai/dsh-session-telemetry": "workspace:^",
+    "@deepseek-ai/dsh-session-title-llm": "workspace:^",
+    "@deepseek-ai/dsh-shell": "workspace:^",
+    "@deepseek-ai/dsh-spill": "workspace:^",
+    "@deepseek-ai/dsh-subagent-in-process-driver": "workspace:^",
+    "@deepseek-ai/dsh-subprocess": "workspace:^",
+    "@deepseek-ai/dsh-timeout": "workspace:^",
+    "@deepseek-ai/dsh-workflow": "workspace:^",
+    "@deepseek-ai/schemastery": "workspace:^",
+    "dsh-better-sidebar": "0.12.1"
+  },
+  "devDependencies": {
+    "electron": "43.4.0",
+    "electron-builder": "26.15.4"
+  },
+  "build": {
+    "appId": "ai.deepseek.harness",
+    "productName": "DeepSeek Harness",
+    "electronVersion": "43.4.0",
+    "asar": false,
+    "npmRebuild": false,
+    "files": [
+      "lib/**/*.js",
+      "package.json",
+      "node_modules/**/*",
+      "!node_modules/.pnpm/**/*",
+      "!node_modules/.bin/**/*"
+    ],
+    "directories": {
+      "output": "../../dist-desktop"
+    },
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "artifactName": "DeepSeek-Harness-${version}-${os}-${arch}.${ext}"
+  }
+}
