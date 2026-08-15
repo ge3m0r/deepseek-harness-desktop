@@ -10,6 +10,8 @@
 
 在仓库根目录运行 `pnpm run desktop:dev`。该命令构建 Host、Client 与 Web 产物，再启动 Electron。桌面子进程使用普通 `web` profile，并与 CLI 共用 `~/.dsh` 数据，包括凭据、设置、会话和 profile patch。
 
+创造模式生成的 Plugin 定义也会保存在 Harness home 下，并在桌面后端重启后重新出现。恢复后的 Plugin 处于停止状态；Run 与 Client 审批不会恢复，用户需要显式重新启动所需 Package。
+
 `desktop:dev` 只执行一次构建，不会监视桌面应用或相邻的插件源码目录。开发插件时，客户端改动使用插件自身的 watch 流程，并需要强制刷新浏览器；Host 改动需要重启桌面后端。打包后的内置插件不可原地修改：更新其依赖、运行 `pnpm install`，再用 `pnpm run desktop:pack` 重新构建安装包，才能分发新版本。
 
 ## 分发
@@ -20,7 +22,7 @@
 
 ## 运行时归属
 
-Electron renderer 不启用 Node 集成，并使用 context isolation 与 Chromium sandbox。它只能在回环 Web 来源内导航；HTTP 与 HTTPS 弹出目标在系统浏览器中打开。桌面进程拒绝 renderer 的权限请求。
+Electron renderer 不启用 Node 集成，并使用 context isolation 与 Chromium sandbox。它只能在回环 Web 来源内导航；HTTP 与 HTTPS 弹出目标在系统浏览器中打开。该应用自有来源可以请求摄像头或麦克风访问，操作系统仍会显示权限提示。桌面进程拒绝其他所有 renderer 权限，并拒绝来自其他来源的媒体请求。
 
 应用退出时向其持有的 `dsh web` 子进程发送 SIGTERM，并等待 7 秒让插件完成清理。如果子进程未完全停止，Electron 会先强制终止它再退出。
 

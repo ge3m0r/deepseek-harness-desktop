@@ -105,9 +105,6 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
-      ],
-      "ignoreDependencies": [
-        "zod"
       ]
     },
     "packages/host/directory-picker-native": {

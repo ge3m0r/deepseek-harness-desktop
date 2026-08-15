@@ -486,12 +486,12 @@ describe('dynamic runner teardown', () => {
       .resolves.toMatchObject({ ok: false, reason: 'plugin-missing' })
   })
 
-  it('answers a missing definition with the memory-only explanation', async () => {
+  it('answers a missing definition without assuming deployment persistence', async () => {
     const { runner } = await setup()
     const receipt = await runner.undefine(AGENT_A, 'dyn-404' as CordisDynamicPluginId)
 
     expect(receipt).toMatchObject({ ok: false, reason: 'plugin-missing' })
-    expect((receipt as { message: string }).message).toContain('lost on DSH restart')
+    expect((receipt as { message: string }).message).toContain('may not persist definitions')
   })
 
   it('unwinds every host half when the runner itself is disposed', async () => {

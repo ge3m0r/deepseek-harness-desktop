@@ -78,7 +78,9 @@ Host-only Package 在 Host 成功建立 Fiber 后提交 current。包含 Client 
 - Host Fiber、Package 私有 handler、等待中的 Service 和最近诊断；
 - Host 与 Client Inspect Registry 的目录和查询路由。
 
-这些对象不写入配置或磁盘，也不在进程重启后恢复。Session Log 可以保留 Tool 调用、结果和卡片所需元数据，但不会重放动态代码来恢复 Registry。进程重启后历史卡片仍可作为对话记录存在，原 `pluginId` 和 `packageId` 不再可运行。
+定义是否持久化由部署配置决定。设置 `persistencePath` 后，Host 会把 Plugin 身份、Session 归属、不可变 Package 元数据以及 Host／Client 源码写入带版本号的 JSON Registry。Host 在排他写锁下以原子替换方式更新文件，并在发布恢复的定义前校验完整格式和已保存源码。Web 与桌面端组合把该 Registry 存放在 Harness 主目录下；未设置该字段的部署继续采用仅进程内行为。
+
+恢复的定义始终处于停止状态。Registry 不持久化或恢复 `currentPackageId`、`nextPackageId`、物理 Run、latest Run、授权、待处理 Client 请求、Fiber、handler、诊断或 Inspect 状态。Session Log 可以保留 Tool 调用、结果和卡片所需元数据，但 replay 绝不会执行动态代码。用户必须显式运行恢复的 Package，并在需要时重新审批 Client 代码。`cordis_undefine` 同时删除持久定义和活跃状态。
 
 运行态不作为可恢复状态写入 Session projection。页面刷新或新页面打开不会自动恢复 Client 半；自动恢复会重新引入连接身份、启动期 baseline 和跨页面一致性协议，不属于当前设计。
 
@@ -233,7 +235,9 @@ Host/Client Guard、Host 求值与 handler、Client 求值与 apply、Slot `onEn
 
 **要求 Slot owner 在运行时注册 props schema。** Slot props 已存在于 TypeScript 类型和 JSDoc 中，重复注册会制造第二份权威。当前设计用 Slot AST Catalog 提取静态协议，只在查询时合并 live tree。
 
-**把运行态写入 Session Log 并在 replay 恢复。** 动态代码和 Fiber 是进程局部对象，恢复要求重新执行历史代码并重新解释审批。Session 只保留模型可见记录，Registry 和页面 Run 不恢复。
+**把运行态写入 Session Log 并在 replay 恢复。** 动态代码和 Fiber 是进程局部对象，恢复要求重新执行历史代码并重新解释审批。Session 保留模型可见记录，独立的定义 Registry 只恢复未执行的源码，不通过 replay 恢复或执行它。
+
+**在进程启动时自动运行持久定义。** 启动期执行会在没有当前用户操作时激活生成代码，还可能复用过期授权。仅恢复静态定义既能保留成果，也会要求重新运行，并在适用时重新审批 Client 代码。
 
 **让历史 Run 卡片扫描后续 Session Log。** 这会让 Tool view 依赖全量日志顺序和后续消息结构。页面 card index/store 已能按 Package 告知旧卡片被替代或 Plugin 被删除。
 
@@ -245,6 +249,7 @@ Host/Client Guard、Host 求值与 handler、Client 求值与 apply、Slot `onEn
 - 单勾只授权当前 Package，双勾授权同一 Plugin 后续版本；授权在技术失败后仍保留，拒绝不执行两侧代码。
 - Host 先激活，Client 后取精确 Run 源码；Client 成功前不提交 Client-bearing Package 的 current，失败后 current/next 可用于重试和回退。
 - 一个 Plugin 同时最多一个物理 Run；stop 撤销两端贡献但保留定义和指针，undefine 删除全部 Package、授权和状态。
+- 配置定义 Registry 后，进程重启仍保留稳定的 Plugin／Package ID 和源码；恢复的定义保持停止状态，且不携带授权或 Run 状态。
 - 当前页面能区分“待激活”“Client 待激活”和“运行中”，待审批时只显示审批动作。
 - `tool.view.cordis` 的 self 绑定 Plugin + Package；同 Package 最新 Run 卡片独占业务 UI，旧卡片和已删除 Plugin 有明确退化状态。
 - Host/Client Guard 拒绝 import、JSX、未声明 Service 和不可用全局；Service、timer、Slot、样式、Tool、handler 和主题覆盖随 Run teardown。
@@ -258,7 +263,8 @@ Host/Client Guard、Host 求值与 handler、Client 求值与 apply、Slot `onEn
 
 ## Risks
 
-- **进程重启丢失全部动态对象。** 历史 Tool 卡片仍在，但 Registry 不恢复；用户必须重新 define。
+- **进程重启会丢失动态运行态。** 已配置的部署会恢复定义，但 Run、版本指针、审批、handler、诊断和页面局部 Client 状态会被丢弃；用户必须显式重新激活所需 Package。
+- **遗留写锁会阻止定义变更。** Host 会明确失败，不冒险让多个 writer 同时修改 Registry。进程异常退出或文件系统故障后可能需要运维人员清理。
 - **多页面状态不是强一致系统。** 第一个有效 Client 成功结果可以提交 current，各页面的 Client 装载和渲染状态仍可能不同；当前不引入连接身份、法定人数或页面聚合。
 - **Client Inspect 可能长期 pending。** Host 保存最近 manifest，但没有页面成功执行 Provider 时不能用旧数据伪装 live 结果；多个页面都失败时请求等待到取消。
 - **跨版本授权扩大信任范围。** 双勾允许同一 Plugin 后续 Package 无需再次审批；UI 必须清楚区分单次和跨版本授权。

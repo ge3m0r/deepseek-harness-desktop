@@ -78,7 +78,9 @@ If an update target fails, the old physical Run is not restarted automatically. 
 - Host Fibers, Package-private handlers, waiting Services, and recent diagnostics;
 - Host and Client Inspect Registry directories and query routing.
 
-These objects are not written to configuration or disk and are not restored after process restart. The Session Log may retain Tool calls, results, and metadata needed by cards, but it does not replay dynamic code to restore the Registry. Historical cards remain in the conversation after a restart, but their original `pluginId` and `packageId` are no longer runnable.
+Definition persistence is deployment-configurable. When `persistencePath` is set, the Host writes Plugin identity, Session ownership, immutable Package metadata, and Host/Client source to a versioned JSON registry. It replaces that file atomically under an exclusive writer lock and validates the complete format plus stored source before publishing restored definitions. The Web and desktop composition stores this registry under the Harness home directory. Deployments that omit the setting retain process-local behavior.
+
+Restored definitions always start stopped. The registry does not persist or restore `currentPackageId`, `nextPackageId`, physical or latest Runs, authorization grants, pending Client requests, Fibers, handlers, diagnostics, or Inspect state. The Session Log may retain Tool calls, results, and metadata needed by cards, but replay never executes dynamic code. The user must explicitly run a restored Package, including a new Client approval when required. `cordis_undefine` removes the durable definition as well as live state.
 
 Runtime state is not written to Session projection as recoverable state. Refreshing a page or opening a new page does not automatically restore Client halves; automatic restoration would reintroduce connection identity, startup baselines, and cross-page consistency protocols, which are outside this design.
 
@@ -233,7 +235,9 @@ After a model-initiated asynchronous Run succeeds, is rejected, or fails technic
 
 **Require Slot owners to register props schemas at runtime.** Slot props already exist in TypeScript types and JSDoc, so duplicate registration creates a second authority. The Slot AST Catalog extracts the static protocol and only merges the live tree at query time.
 
-**Write runtime state to the Session Log and restore it during replay.** Dynamic code and Fibers are process-local objects. Restoration would require re-executing historical code and reinterpreting approval. The Session retains only model-visible records; the Registry and page Runs are not restored.
+**Write runtime state to the Session Log and restore it during replay.** Dynamic code and Fibers are process-local objects. Restoration would require re-executing historical code and reinterpreting approval. The Session retains model-visible records, while the separate definition registry restores inert source without replaying or executing it.
+
+**Automatically run persisted definitions during process startup.** Startup execution would activate generated code without a current user action and could reuse stale authorization. Restoring only inert definitions preserves the work while requiring a fresh run and any applicable Client approval.
 
 **Make historical Run cards scan later Session Log entries.** This couples Tool views to the complete log order and later message structure. The page card index/store already tells cards by Package when a later Run replaces them or their Plugin is deleted.
 
@@ -245,6 +249,7 @@ After a model-initiated asynchronous Run succeeds, is rejected, or fails technic
 - A single check authorizes only the current Package, and a double check authorizes future versions of the same Plugin. Authorization survives technical failure, while rejection executes neither half.
 - The Host activates first and the Client then fetches source for the exact Run. A Client-bearing Package does not commit current before Client success, and current/next permit retry and rollback after failure.
 - One Plugin has at most one physical Run at a time. Stop tears down both halves while retaining definitions and pointers; undefine deletes every Package, authorization, and state.
+- A configured definition registry survives process restart with stable Plugin and Package IDs and source, while restored definitions remain stopped and carry no authorization or Run state.
 - The current page distinguishes “Ready,” “Client ready to activate,” and “Running,” and a pending-approval row shows only approval actions.
 - `tool.view.cordis` self binds Plugin + Package. The newest Run card for a Package exclusively owns its business UI, while old cards and deleted Plugins have explicit fallback states.
 - Host and Client Guards reject imports, JSX, undeclared Services, and unavailable globals. Services, timers, Slots, styles, Tools, handlers, and theme overrides are torn down with the Run.
@@ -258,7 +263,8 @@ After a model-initiated asynchronous Run succeeds, is rejected, or fails technic
 
 ## Risks
 
-- **A process restart loses all dynamic objects.** Historical Tool cards remain, but the Registry is not restored; the user must define again.
+- **A process restart loses dynamic runtime state.** Configured deployments restore definitions, but Runs, version pointers, approvals, handlers, diagnostics, and page-local Client state are discarded. The user must explicitly activate the required Package again.
+- **A stale writer lock blocks definition changes.** The Host fails loud instead of risking concurrent registry writers. Operator recovery may be required after an unclean process or filesystem failure.
 - **Multi-page state is not strongly consistent.** The first valid Client success may commit current while Client loading and rendering state still differs across pages. This version does not introduce connection identity, quorum, or page aggregation.
 - **Client Inspect may remain pending indefinitely.** The Host stores the latest manifest, but without a page successfully executing the Provider it cannot present stale data as a live result. If every page fails, the request waits until cancellation.
 - **Cross-version authorization expands trust.** A double check permits future Packages of the same Plugin without further approval. The UI must clearly distinguish per-Package and cross-version authorization.

@@ -15,10 +15,10 @@ export const name = 'cordis-host-runner-invariant'
 export const inject = ['invariants']
 
 /**
- * No runtime invariant: the definition registry is process memory with no event
- * stream to observe, and its one owned relation (a running definition owns a
- * settled host-half fiber and its handler table) is established and unwound
- * inside single awaited verbs, so package tests assert it directly.
+ * No runtime invariant: definition persistence has no event stream, and its
+ * running-definition relation to a settled host-half fiber and handler table is
+ * established and unwound inside single awaited verbs; package tests assert
+ * the durable reload and live lifecycle directly.
  */
 const install: InvariantInstaller = () => {}
 

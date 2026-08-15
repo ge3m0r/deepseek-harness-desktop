@@ -12,7 +12,7 @@ Status: implemented
 
 `apps/desktop` 是 Electron 应用，其主进程持有一个 `dsh web` 子进程。它通过 Electron 的 Node 运行时和 `ELECTRON_RUN_AS_NODE=1` 启动已安装的 CLI，在操作系统分配的回环端口上监听，等待既有 `dsh web:` 就绪信息，再只加载该信息发布的来源。子进程使用普通 `web` profile 与 `~/.dsh`；因此桌面分发与 CLI 共用配置、凭据、会话、插件组合和文件系统行为，不定义桌面专属组合。
 
-renderer 禁用 `nodeIntegration`，并启用 context isolation 与 Chromium sandbox。导航限制在回环来源内，renderer 权限请求全部拒绝，HTTP 或 HTTPS 弹出目标在操作系统浏览器中打开。renderer 代码不会获得 Electron 或 Node bridge。
+renderer 禁用 `nodeIntegration`，并启用 context isolation 与 Chromium sandbox。导航限制在回环来源内，[桌面媒体权限白名单](../feature/2026-08-15-desktop-media-permission-allowlist.md)将摄像头和麦克风请求限制在该来源，HTTP 或 HTTPS 弹出目标在操作系统浏览器中打开。renderer 代码不会获得 Electron 或 Node bridge。
 
 桌面进程持有子进程的关闭过程。应用退出时发送 SIGTERM，并等待 7 秒让 Web 插件树 dispose（资源释放）；如果子进程未在宽限时间内退出，则发送 SIGKILL。并发退出请求加入同一个停止操作，因此 Electron 不会遗留仍在运行的 Host 进程。
 

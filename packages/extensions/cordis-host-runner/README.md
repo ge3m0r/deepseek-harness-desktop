@@ -23,9 +23,11 @@ A definition another session defined reads as absent rather than forbidden, so n
 
 Four forwarded events belong to this feature, declared by this package on its client-safe [`./types`](src/types.ts) subpath and allowlisted for delivery by [`@deepseek-ai/dsh-api-remotes`](../../api/remotes/README.md), which is what lets a browser reach them through `ctx.remote.$on`: `cordis/request-run` (`{requestId, agentId, id, name, purpose}` — metadata, never code), `cordis/request-run-resolved` (`{requestId, outcome}`), `dynamicCordisRunner/package` (`{id, name, rev}`), and `dynamicCordisRunner/retract` (`{id, rev}`). The last two are a symmetric pair announcing run state — every fresh start and every stop, whether or not the package has a browser half.
 
-## Storage stance
+## Definition persistence
 
-The registry is process memory and the only source of truth. The session log carries a define call's metadata — never its code — so a restarted process legitimately has no definitions, and a card whose id no longer resolves says exactly that rather than pretending it can run. Nothing here is written to disk, and no definition is restored automatically; a reloaded page holds nothing until someone runs a package again, which is what makes it bind the live host half and re-fetch the browser half.
+`persistencePath` enables a versioned JSON registry for Plugin identities and immutable Package metadata and source. `define` commits the complete owner-only file through an exclusive writer lock and same-directory atomic rename before publishing a new definition; `undefine` stops the Run, commits removal, then deletes the in-memory record. Startup validates the whole file and every stored code half before publishing the service. A malformed format, unsupported version, invalid source, duplicate identity, or orphaned writer lock fails activation instead of loading a partial registry.
+
+Runs, pending requests, version pointers, diagnostics, and Client approval grants remain process-local. Restored Plugins are stopped, so code never executes merely because the Host restarted; a later run repeats the ordinary approval and activation path. Omitting `persistencePath` retains the process-memory behavior used by temporary and headless compositions.
 
 ## Trust stance
 
@@ -36,8 +38,9 @@ The vm sandbox isolates globals but is not a security boundary: Node globals are
 | Field | Default | Meaning |
 |---|---|---|
 | `vmTimeoutMs` | `5000` | Milliseconds the synchronous portion of a host half may run in the vm before evaluation is aborted |
+| `persistencePath` | omitted | JSON file that preserves definitions while leaving Runs and approvals process-local |
 
-One field is all there is: a run request waits for a person, so the round trip has no deadline of its own.
+A run request waits for a person, so the round trip has no deadline of its own.
 
 ## Export shape
 
@@ -49,7 +52,7 @@ Service package: default-exports `DynamicCordisRunnerService` (service key `dyna
 
 #### What the model sees
 
-Nothing directly: this package registers no tool and injects no prompt. Its refusals reach the model through the `cordis_*` tool results that call it — an unparseable half names the offending line, a missing definition explains that definitions live in memory only, a `rejected` or `cancelled` run reports that a person declined or the turn ended rather than that anything failed, and a failed browser-half load carries the answering page's own error text.
+Nothing directly: this package registers no tool and injects no prompt. Its refusals reach the model through the `cordis_*` tool results that call it — an unparseable half names the offending line, a missing definition explains that it was removed, belongs to another Session, or was not persisted by this deployment, a `rejected` or `cancelled` run reports that a person declined or the turn ended rather than that anything failed, and a failed browser-half load carries the answering page's own error text.
 
 #### Token effect
 
@@ -62,6 +65,7 @@ A host half that registers tools changes the next request's tool view, which inv
 ## Known Limitations and Deferred Work
 
 - **A successful run does not mean the UI rendered.** `run` returns once the answering page has LOADED the browser half; React renders afterwards, so a component that throws cannot possibly appear in the run receipt. The failure surfaces through `reportRenderFailure` and is read back with `cordis_inspect what:"temporary"`; the run result says so rather than implying success.
+- **A leftover writer lock requires operator recovery.** The persistence writer never removes an existing lock because its age cannot prove that another Host stopped; definitions already committed remain readable, while define and undefine fail until the lock is removed after confirming no writer is active.
 
 - A package with a browser half **suspends where no page is connected** — headless and ACP deployments hold the run until the asking turn is cancelled, because a forwarded event reports nothing about who received it. Host-only packages are unaffected.
 - A suspended run request has **no timeout**: it waits for a person until the asking turn is cancelled, so unattended automation cannot use packages with a browser half.
@@ -69,4 +73,4 @@ A host half that registers tools changes the next request's tool view, which inv
 - `runHostHalf` carries no request id, so "which request evaluated this host half" is attributed host-side to the most recently armed request for that definition; several concurrent run requests for one definition would need that rule revisited.
 - A success answer naming a superseded revision is refused (`accepted: false`) and leaves the request suspended, so the model's call ends only through a valid answer or its own cancellation. Settling it would take a fresh orchestration against the live revision, and no page does that today — the [browser half](../cordis-client-runner/README.md) does not read the ack — so in practice such a request is closed by another page's answer or by the caller's cancellation.
 - A browser half's declared `inject` is read from the plugin it returns in the page, so the announcement carries no service-declaration field at all.
-- **`zod` is a runtime dependency of the generated TypeRT faces, not of `src`.** `./typert` and `./remote` resolve to `lib/typert.*.js`, which `tsc` emits unbundled with a bare `import { z } from 'zod'`, so the package must declare it (the `@deepseek-ai/dsh-goal` precedent) and `knip.json` must ignore it for this workspace — knip reads source, and these faces are build products. Nothing in `src` imports zod.
+- **`zod` validates the durable registry and the generated TypeRT faces.** Startup rejects malformed stored records through the source import, while `./typert` and `./remote` retain their unbundled runtime import.

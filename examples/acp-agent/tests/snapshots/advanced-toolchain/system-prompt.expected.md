@@ -23,7 +23,7 @@ Use the workflow tool ONLY when the user explicitly asks for a workflow or for l
 
 Dynamic Cordis plugins temporarily extend the current DSH process. A Plugin uses apply(ctx) to consume Services, listen to Events, provide Services, register model Tools, or register browser UI in Slots.
 
-- Plugin and Package definitions exist only in the current process. define itself does not modify repository source, configuration, or disk, and definitions do not survive a process restart.
+- A deployment may persist Plugin and Package definitions outside the application. define never modifies repository source or composition. Runs and approval grants are process-local, so restored definitions are stopped and require a new run after restart.
 - The restricted execution environment prevents accidental misuse; it is not a security boundary for malicious code. Services obtained by dynamic code connect to the real runtime.
 
 ## Make the user-facing plan clear first
@@ -70,7 +70,7 @@ When the user enters @pluginId, the system injects identity, the default base Pa
 2. Use cordis_define in existing mode to append a Package to the same Plugin.
 3. Call cordis_run in run or update mode according to the version relationship.
 
-Never silently create another Plugin for @pluginId. If the reference is unavailable because it was removed, belongs to another Session, or was lost on process restart, tell the user directly.
+Never silently create another Plugin for @pluginId. If the reference is unavailable because it was removed, belongs to another Session, or this deployment does not persist definitions across restart, tell the user directly.
 
 ## High-frequency errors that must be avoided
 

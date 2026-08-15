@@ -10,6 +10,8 @@ The distribution includes `dsh-better-sidebar` and mounts its bundle patch autom
 
 From the repository root, run `pnpm run desktop:dev`. This builds the Host, Client, and Web artifacts before launching Electron. The desktop child uses the ordinary `web` profile and the same `~/.dsh` data as the CLI, including credentials, settings, sessions, and profile patches.
 
+Creation-mode Plugin definitions are also stored under the Harness home and reappear after the desktop backend restarts. They return in the stopped state; Runs and Client approvals are intentionally not restored, so the user explicitly starts the required Package again.
+
 `desktop:dev` performs one build and does not watch the desktop application or a sibling plugin checkout. During plugin development, client changes use the plugin's watch workflow and require a hard browser refresh, while Host changes require restarting the desktop backend. A packaged built-in plugin is immutable: update its dependency, run `pnpm install`, and rebuild the installer with `pnpm run desktop:pack` to distribute a new version.
 
 ## Distribution
@@ -20,7 +22,7 @@ Production downloads require platform signing credentials to avoid operating-sys
 
 ## Runtime ownership
 
-The Electron renderer has no Node integration and runs with context isolation and Chromium sandboxing. It can navigate only within the loopback Web origin; HTTP and HTTPS popup targets open in the system browser. The desktop process denies renderer permission requests.
+The Electron renderer has no Node integration and runs with context isolation and Chromium sandboxing. It can navigate only within the loopback Web origin; HTTP and HTTPS popup targets open in the system browser. That owned origin may request camera or microphone access, which remains subject to the operating-system permission prompt. The desktop process denies every other renderer permission and rejects media requests from other origins.
 
 Application exit sends SIGTERM to the owned `dsh web` child and waits seven seconds for plugin teardown. A child that does not reach quiescence is force-terminated before Electron exits.
 

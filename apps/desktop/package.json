@@ -13,7 +13,7 @@
   "type": "module",
   "main": "lib/main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "node scripts/start.mjs",
     "pack": "tsx ../../scripts/build-desktop.ts"
   },
   "dependencies": {
@@ -63,6 +63,10 @@
     },
     "mac": {
       "category": "public.app-category.developer-tools",
+      "extendInfo": {
+        "NSCameraUsageDescription": "DeepSeek Harness uses the camera when you enable a camera feature or plugin.",
+        "NSMicrophoneUsageDescription": "DeepSeek Harness uses the microphone when you enable a voice feature or plugin."
+      },
       "target": [
         "dmg",
         "zip"

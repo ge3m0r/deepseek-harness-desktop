@@ -147,6 +147,25 @@ export class DynamicCordisRegistry {
   private nextApproval = 1
 
   /**
+   * Restore stopped definitions before the service becomes visible.
+   * @param plugins - validated durable records in original creation order.
+   */
+  restore(plugins: readonly DynamicCordisPlugin[]): void {
+    if (this.plugins.size !== 0) throw new Error('dynamic Cordis registry: restore requires an empty registry')
+    let highestPlugin = 0
+    let highestPackage = 0
+    for (const plugin of plugins) {
+      this.plugins.set(plugin.pluginId, plugin)
+      highestPlugin = Math.max(highestPlugin, numericSuffix(plugin.pluginId))
+      for (const packageId of plugin.packages.keys()) {
+        highestPackage = Math.max(highestPackage, numericSuffix(packageId))
+      }
+    }
+    this.nextPlugin = highestPlugin + 1
+    this.nextPackage = highestPackage + 1
+  }
+
+  /**
    * Mint a semantic plugin ID without reusing a prior suffix.
    * @param prefix - validated lowercase semantic prefix proposed by the model.
    * @returns a process-unique Plugin ID.
@@ -273,4 +292,9 @@ export class DynamicCordisRegistry {
     }
     return undefined
   }
+}
+
+/** Numeric suffix of one validated Host-minted identity. */
+function numericSuffix(id: string): number {
+  return Number(id.slice(id.lastIndexOf('-') + 1))
 }

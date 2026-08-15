@@ -2,6 +2,7 @@
 
 import { app, BrowserWindow, dialog, shell } from 'electron'
 import { DesktopBackend } from './backend.ts'
+import { allowsDesktopMediaPermission } from './permissions.ts'
 
 const backend = new DesktopBackend()
 let mainWindow: BrowserWindow | undefined
@@ -21,6 +22,22 @@ function createWindow(url: string): BrowserWindow {
       nodeIntegration: false,
       sandbox: true,
     },
+  })
+  const { session } = window.webContents
+  session.setPermissionCheckHandler((contents, permission, requestingOrigin, details) => (
+    contents === window.webContents
+      && allowsDesktopMediaPermission(permission, allowedOrigin, [
+        requestingOrigin,
+        details.securityOrigin,
+        details.requestingUrl,
+      ])
+  ))
+  session.setPermissionRequestHandler((contents, permission, callback, details) => {
+    const securityOrigin = 'securityOrigin' in details ? details.securityOrigin : undefined
+    callback(
+      contents === window.webContents
+        && allowsDesktopMediaPermission(permission, allowedOrigin, [details.requestingUrl, securityOrigin]),
+    )
   })
   window.webContents.setWindowOpenHandler(({ url: target }) => {
     try {
@@ -65,9 +82,6 @@ else {
   app.on('window-all-closed', () => { app.quit() })
   app.whenReady().then(async () => {
     app.setName('DeepSeek Harness')
-    app.on('web-contents-created', (_event, contents) => {
-      contents.session.setPermissionRequestHandler((_webContents, _permission, callback) => { callback(false) })
-    })
     await launch()
   }).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error)

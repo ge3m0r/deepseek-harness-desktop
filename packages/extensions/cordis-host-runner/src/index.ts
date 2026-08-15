@@ -22,6 +22,7 @@ import type {
   DynamicCordisReference, DynamicCordisRun,
 } from './registry.ts'
 import { createSandbox, evaluateHostCode, precheckCode } from './sandbox.ts'
+import { loadDefinitions, saveDefinitions } from './persistence.ts'
 import type {
   ApprovalRequestId, CordisDynamicPackageId, CordisDynamicPluginId, CordisDynamicPluginRunId, CordisErrorDetails,
   CordisDynamicRunMode, CordisInspectProviderManifest, CordisInspectQueryResolution,
@@ -79,7 +80,7 @@ export function ApprovalRequestId(id: string): ApprovalRequestId {
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
-    /** Process-local dynamic Plugin registry and lifecycle service. */
+    /** Dynamic Plugin definition registry and process-local lifecycle service. */
     dynamicCordisRunner: DynamicCordisRunnerService
   }
 }
@@ -88,9 +89,14 @@ declare module '@deepseek-ai/cordis' {
 export interface Config {
   /** Maximum synchronous VM evaluation time in milliseconds. */
   vmTimeoutMs?: number
+  /** JSON file that persists stopped definitions; omission keeps definitions process-local. */
+  persistencePath?: string
 }
 
-type ResolvedConfig = Required<Config>
+interface ResolvedConfig {
+  vmTimeoutMs: number
+  persistencePath?: string
+}
 
 /** Host-only snapshot consumed by inspect and tool result rendering. */
 export interface DynamicCordisSnapshotRow {
@@ -126,6 +132,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
 
   static Config: z<Config> = z.object({
     vmTimeoutMs: z.number().min(1).default(5000),
+    persistencePath: z.string(),
   })
 
   private readonly rootCtx: Context
@@ -140,6 +147,16 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     super(ctx, 'dynamicCordisRunner')
     this.rootCtx = ctx
     this.resolved = config as ResolvedConfig
+    if (this.resolved.persistencePath !== undefined) {
+      const restored = loadDefinitions(this.resolved.persistencePath)
+      for (const plugin of restored) {
+        for (const definition of plugin.packages.values()) {
+          if (definition.hostCode !== undefined) precheckCode(definition.hostCode, 'code.host')
+          if (definition.clientCode !== undefined) precheckCode(definition.clientCode, 'code.client')
+        }
+      }
+      this.registry.restore(restored)
+    }
     this.inspectRegistry = new CordisInspectRegistryService(ctx)
   }
 
@@ -173,7 +190,6 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
         approvedClientPackages: new Set(),
         clientVersionUpdatesApproved: false,
       }
-      this.registry.add(plugin)
     } else {
       const found = this.registry.get(request.plugin.pluginId)
       if (found === undefined || found.sessionId !== request.sessionId) {
@@ -190,6 +206,14 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
       ...request.code.host === undefined ? {} : { hostCode: request.code.host },
       ...request.code.client === undefined ? {} : { clientCode: request.code.client },
     }
+    const nextPlugin: DynamicCordisPlugin = {
+      ...plugin,
+      packages: new Map([...plugin.packages, [packageId, definition]]),
+    }
+    this.persistDefinitions(request.plugin.kind === 'new'
+      ? [...this.registry.all(), nextPlugin]
+      : this.registry.all().map(candidate => candidate === plugin ? nextPlugin : candidate))
+    if (request.plugin.kind === 'new') this.registry.add(plugin)
     plugin.packages.set(packageId, definition)
     return {
       pluginId: plugin.pluginId,
@@ -213,8 +237,14 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     const wasRunning = plugin.run !== undefined
     this.cancelPending(pluginId, `dynamic plugin "${pluginId}" was removed before approval`)
     if (plugin.run !== undefined) await this.retract(plugin)
+    this.persistDefinitions(this.registry.all().filter(candidate => candidate !== plugin))
     this.registry.delete(pluginId)
     return { ok: true, wasRunning }
+  }
+
+  /** Persist a complete definition snapshot when this deployment configured a file. */
+  private persistDefinitions(plugins: readonly DynamicCordisPlugin[]): void {
+    if (this.resolved.persistencePath !== undefined) saveDefinitions(this.resolved.persistencePath, plugins)
   }
 
   /**
@@ -1245,7 +1275,7 @@ function missingFor(ctx: Context, run: DynamicCordisRun): string[] {
 }
 
 function missingPluginMessage(id: CordisDynamicPluginId): string {
-  return `no dynamic plugin "${id}" in this process — it may have been removed or lost on DSH restart`
+  return `no dynamic plugin "${id}" in this process — it may have been removed or this deployment may not persist definitions across DSH restart`
 }
 
 function errorDetails(error: unknown): CordisErrorDetails {

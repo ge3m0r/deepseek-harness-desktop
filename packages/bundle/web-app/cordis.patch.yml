@@ -101,6 +101,8 @@
 
     - id: cordis-host-runner
       name: '@deepseek-ai/dsh-cordis-host-runner'
+      config:
+        persistencePath: !!js dshHomePath('dynamic-cordis/registry.json')
 
     # Ordinary provider for the parsed Web flags. Its plugin-level injection
     # waits for cmdlineArgs; no launcher metadata or special row kind is needed.

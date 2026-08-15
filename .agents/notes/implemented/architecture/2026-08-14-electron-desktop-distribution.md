@@ -12,7 +12,7 @@ The browser application requires users to install Node, install the npm workspac
 
 `apps/desktop` is an Electron application whose main process owns one `dsh web` child. It starts the installed CLI through Electron's Node runtime with `ELECTRON_RUN_AS_NODE=1`, binds an OS-assigned loopback port, waits for the existing `dsh web:` readiness line, and loads only that published origin. The child uses the ordinary `web` profile and `~/.dsh`; the desktop distribution therefore shares the CLI's configuration, credentials, sessions, plugin composition, and filesystem behavior instead of defining a desktop-specific composition.
 
-The renderer keeps `nodeIntegration` disabled and enables context isolation and Chromium sandboxing. Navigation remains on the loopback origin, renderer permission requests are denied, and HTTP or HTTPS popup targets open in the operating-system browser. Renderer code receives no Electron or Node bridge.
+The renderer keeps `nodeIntegration` disabled and enables context isolation and Chromium sandboxing. Navigation remains on the loopback origin, the [desktop media permission allowlist](../feature/2026-08-15-desktop-media-permission-allowlist.md) limits camera and microphone requests to that origin, and HTTP or HTTPS popup targets open in the operating-system browser. Renderer code receives no Electron or Node bridge.
 
 The desktop process owns child shutdown. Application exit sends SIGTERM and waits seven seconds for the Web plugin tree to dispose; a child that does not exit within that grace receives SIGKILL. Concurrent exit requests join one stop operation, so Electron does not abandon a still-running Host process.
 
