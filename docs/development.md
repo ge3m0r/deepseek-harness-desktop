@@ -118,7 +118,7 @@ Contributors can opt into the comprehensive local gate set with `pnpm run check:
 
 ### CI gates
 
-The keyless [CI workflow](../.github/workflows/ci.yml) groups independent gates into broad lanes and runs a smaller compatibility signal across supported Node versions. Artifact consumers wait for one build within their lane. The separate real-API workflow runs `pnpm run test:e2e` with its configured worker bound. See [scripts/run-gates.ts](../scripts/run-gates.ts) and the workflow files for the current gate and job inventory.
+The keyless [CI workflow](../.github/workflows/ci.yml) groups independent gates into broad lanes and runs a smaller compatibility signal across supported Node versions. Artifact consumers wait for one build within their lane. Real-API e2e remains a local, opt-in command because repository CI does not require an external API secret. See [scripts/run-gates.ts](../scripts/run-gates.ts), the workflow files, and the [keyless-only CI decision](../.agents/notes/implemented/simplification/2026-08-15-remove-real-api-e2e-workflow.md) for the current gate inventory.
 
 ### Daily commands
 
